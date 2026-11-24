@@ -1,0 +1,13 @@
+{
+  "name": "invitations",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Personalised wedding invitations: pick guests, pick a template, get one picture per guest",
+  "scripts": {
+    "start": "node serve.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

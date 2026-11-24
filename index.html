@@ -1,0 +1,296 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Приглашения</title>
+  <meta name="robots" content="noindex">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23f7f1ea'/%3E%3Cpath d='M16 25s-8-5-8-11a4.5 4.5 0 0 1 8-2.8A4.5 4.5 0 0 1 24 14c0 6-8 11-8 11z' fill='none' stroke='%23b96e4c' stroke-width='1.6'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Alice&family=Bad+Script&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400;1,500&family=Forum&family=Great+Vibes&family=Lora:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Marck+Script&family=Montserrat:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Prata&family=Tenor+Sans&display=swap">
+  <link rel="stylesheet" href="styles.css">
+  <script type="module" src="js/app.js"></script>
+</head>
+<body>
+  <header class="bar">
+    <span class="brand">Приглашения</span>
+    <nav class="tabs" aria-label="Разделы">
+      <button class="tab is-active" data-view="create">Создать</button>
+      <button class="tab" data-view="done">Готовые <span class="tab__count" id="doneCount" hidden>0</span></button>
+    </nav>
+  </header>
+
+  <main>
+    <!-- ===== Create: guests on the left, template catalogue on the right ===== -->
+    <section class="view view--create" id="view-create">
+      <aside class="panel guests">
+        <div class="panel__head">
+          <h2 class="panel__title">Список гостей <span class="muted" id="guestCount"></span></h2>
+          <button class="btn btn--ghost btn--sm" id="addGuestsBtn">+ Добавить</button>
+        </div>
+        <div class="guests__tools" id="guestTools" hidden>
+          <input type="search" class="input" id="guestSearch" placeholder="Найти гостя" aria-label="Найти гостя">
+          <div class="guests__sel">
+            <label class="check"><input type="checkbox" id="selectAll"> <span>Выбрать всех</span></label>
+            <span class="muted" id="selCount"></span>
+          </div>
+          <div class="bulk" id="bulk" hidden>
+            <button class="link" id="pairBtn" hidden>Объединить в пару</button>
+            <select class="input input--sm" id="moveSelect" aria-label="Перенести в группу"></select>
+            <button class="link link--danger" id="deleteBtn">Удалить</button>
+          </div>
+        </div>
+        <div class="guests__list" id="guestList"></div>
+        <div class="empty" id="guestEmpty">
+          <span class="ornament">❦</span>
+          <p>Список пока пуст.<br>Вставьте имена или загрузите файл со списком гостей.</p>
+          <button class="btn" id="emptyAddBtn">Добавить гостей</button>
+        </div>
+      </aside>
+
+      <section class="panel catalog">
+        <div class="panel__head">
+          <h2 class="panel__title">Каталог шаблонов</h2>
+          <span class="muted panel__hint">Нажмите на шаблон, чтобы выбрать его</span>
+        </div>
+        <div class="catalog__grid" id="catalog"></div>
+      </section>
+    </section>
+
+    <!-- ===== Finished invitations ===== -->
+    <section class="view view--done" id="view-done" hidden>
+      <div class="panel">
+        <div class="panel__head">
+          <h2 class="panel__title">Готовые приглашения</h2>
+        </div>
+        <div class="toolbar" id="doneToolbar">
+          <div class="filters" id="filters">
+            <button class="chip" data-f="all">Все <span></span></button>
+            <button class="chip" data-f="check">Проверьте <span></span></button>
+            <button class="chip" data-f="adjusted">Подогнано <span></span></button>
+            <button class="chip" data-f="ok">Отлично <span></span></button>
+            <button class="chip" data-f="manual">Вручную <span></span></button>
+          </div>
+          <input type="search" class="input toolbar__search" id="doneSearch" placeholder="Найти гостя" aria-label="Найти гостя">
+          <div class="toolbar__right">
+            <select class="input input--sm" id="formatSelect" aria-label="Формат файла">
+              <option value="jpg">JPG</option>
+              <option value="png">PNG</option>
+            </select>
+            <button class="btn btn--sm" id="zipBtn">Скачать все · ZIP</button>
+            <button class="link link--danger" id="clearResults">Очистить</button>
+          </div>
+        </div>
+        <div class="results" id="results"></div>
+        <div class="empty" id="resultsEmpty" hidden>
+          <span class="ornament">❦</span>
+          <p>Здесь появятся готовые приглашения.<br>Отметьте гостей, выберите шаблон и нажмите «Создать».</p>
+          <button class="btn btn--ghost" id="doneEmptyBtn">К списку гостей</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div class="actionbar" id="actionbar" hidden>
+    <p class="actionbar__text" id="actionText"></p>
+    <button class="btn" id="generateBtn" disabled>Создать приглашения</button>
+  </div>
+
+  <input type="file" id="tplFile" accept="image/png,image/jpeg,image/webp" hidden>
+  <input type="file" id="tplReplaceFile" accept="image/png,image/jpeg,image/webp" hidden>
+  <input type="file" id="guestFile" accept=".docx,.txt,.csv,text/plain" hidden>
+  <input type="file" id="fontFile" accept=".ttf,.otf,.woff,.woff2" hidden>
+  <datalist id="groupList"></datalist>
+  <datalist id="audienceList">
+    <option value="Вы — один гость">
+    <option value="ты — один гость">
+    <option value="Пары и семьи (вас)">
+    <option value="Deutsch · Sie">
+    <option value="Deutsch · du">
+    <option value="Deutsch · ihr">
+  </datalist>
+
+  <!-- ===== Add guests ===== -->
+  <dialog class="modal" id="addDialog" aria-labelledby="addTitle">
+    <div class="modal__head">
+      <h2 class="modal__title" id="addTitle">Добавить гостей</h2>
+      <button class="x" id="addClose" aria-label="Закрыть">×</button>
+    </div>
+    <div class="modal__body">
+      <label class="field">
+        <span>Имена — по одному на строку</span>
+        <textarea class="input" id="addText" rows="9" placeholder="Мария&#10;Оля и Костя Белоусовы&#10;Тётя Галя (сестра мамы)&#10;&#10;Немцы:&#10;Sabine&#10;Thomas und Petra"></textarea>
+      </label>
+      <p class="help">Строка с двоеточием на конце («Немцы:») начинает новую группу. В Word-файле группы берутся из заголовков между нумерованными списками.</p>
+      <label class="field">
+        <span>Группа для этих имён</span>
+        <input class="input" id="addGroup" list="groupList" placeholder="Гости">
+      </label>
+      <label class="check"><input type="checkbox" id="addStrip" checked> <span>Убирать пометки в скобках и после тире — они сохранятся как заметка</span></label>
+    </div>
+    <div class="modal__foot">
+      <button class="btn btn--ghost" id="addFileBtn">Из файла · .docx, .txt</button>
+      <button class="btn" id="addConfirm">Добавить</button>
+    </div>
+  </dialog>
+
+  <!-- ===== Template editor ===== -->
+  <dialog class="sheet" id="editor" aria-labelledby="editorTitle">
+    <div class="sheet__inner">
+      <div class="sheet__head">
+        <h2 class="modal__title" id="editorTitle">Шаблон</h2>
+        <p class="muted sheet__hint">Растяните рамку там, где должно стоять имя. Можно нарисовать новую рамку мышкой.</p>
+        <button class="x" id="editorClose" aria-label="Закрыть">×</button>
+      </div>
+      <div class="editor">
+        <div class="stage" id="stage">
+          <div class="stage__frame" id="stageFrame">
+            <canvas id="stageCanvas"></canvas>
+            <div class="namebox" id="nameBox">
+              <span class="namebox__tag">имя</span>
+              <span class="namebox__h" data-h="nw"></span><span class="namebox__h" data-h="ne"></span>
+              <span class="namebox__h" data-h="sw"></span><span class="namebox__h" data-h="se"></span>
+              <span class="namebox__h namebox__h--side" data-h="w"></span><span class="namebox__h namebox__h--side" data-h="e"></span>
+            </div>
+          </div>
+        </div>
+
+        <div class="editor__side">
+          <section class="egroup">
+            <label class="field"><span>Название шаблона</span><input class="input" data-bind="title" maxlength="60"></label>
+            <label class="field"><span>Для кого</span><input class="input" data-bind="audience" list="audienceList" placeholder="например, «Пары и семьи (вас)»" maxlength="60"></label>
+          </section>
+
+          <section class="egroup">
+            <h3 class="egroup__title">Обращение</h3>
+            <div class="presets">
+              <button class="chip" data-preset="ru">Дорогой / Дорогая</button>
+              <button class="chip" data-preset="de">Lieber / Liebe</button>
+              <button class="chip" data-preset="deSie">Sehr geehrte</button>
+            </div>
+            <label class="field field--row"><span>Ему</span><input class="input" data-bind="greet.m"></label>
+            <label class="field field--row"><span>Ей</span><input class="input" data-bind="greet.f"></label>
+            <label class="field field--row"><span>Паре</span><input class="input" data-bind="greet.pl"></label>
+            <p class="help">{имя} заменится именем гостя. Какой вариант брать, решает отметка «он / она / пара» в списке гостей.</p>
+          </section>
+
+          <section class="egroup">
+            <h3 class="egroup__title">Надпись</h3>
+            <div class="field">
+              <span>Шрифт</span>
+              <div class="row">
+                <select class="input" id="fFamily" data-bind="font.family" aria-label="Шрифт"></select>
+                <button class="btn btn--ghost btn--sm" id="fontUpload" title="Загрузить свой шрифт (.ttf, .otf, .woff)">Свой…</button>
+              </div>
+            </div>
+            <div class="row row--2">
+              <label class="field"><span>Начертание</span><select class="input" id="fWeight" data-bind="font.weight" data-num></select></label>
+              <div class="field">
+                <span>Цвет</span>
+                <div class="row">
+                  <input type="color" class="color" id="fColor" data-bind="font.color" aria-label="Цвет надписи">
+                  <button class="btn btn--ghost btn--sm" id="pickColor" title="Взять цвет с картинки">Пипетка</button>
+                </div>
+              </div>
+            </div>
+            <label class="field range"><span>Размер <output data-out="font.size"></output></span><input type="range" min="0.01" max="0.14" step="0.001" data-bind="font.size"></label>
+            <label class="field range"><span>Расстояние между буквами <output data-out="font.spacing"></output></span><input type="range" min="0" max="0.5" step="0.01" data-bind="font.spacing"></label>
+            <div class="row row--wrap">
+              <label class="check"><input type="checkbox" data-bind="font.upper"> <span>ЗАГЛАВНЫМИ</span></label>
+              <label class="check"><input type="checkbox" data-bind="font.italic"> <span><i>Курсив</i></span></label>
+              <div class="seg" role="group" aria-label="Выравнивание">
+                <button data-align="left" title="По левому краю рамки">⟸</button>
+                <button data-align="center" title="По центру рамки">⟺</button>
+                <button data-align="right" title="По правому краю рамки">⟹</button>
+              </div>
+            </div>
+          </section>
+
+          <section class="egroup">
+            <h3 class="egroup__title">Старое имя на картинке</h3>
+            <p class="hint" id="tHint" hidden>В рамке уже что-то нарисовано — наверное, имя из образца. Включите «Закрасить», иначе новое имя ляжет поверх.</p>
+            <div class="row row--wrap">
+              <label class="check"><input type="checkbox" data-bind="erase.on"> <span>Закрасить рамку цветом фона</span></label>
+              <input type="color" class="color" id="eraseColor" aria-label="Цвет заливки">
+              <button class="link" id="eraseAuto" hidden>подобрать сам</button>
+            </div>
+          </section>
+
+          <section class="egroup">
+            <h3 class="egroup__title">Длинные имена</h3>
+            <p class="help">Если имя не влезает или задевает рисунок, программа сама уменьшит его, сдвинет в сторону или перенесёт на две строки — в этих пределах:</p>
+            <label class="field range"><span>Уменьшать шрифт <output data-out="fit.minScale"></output></span><input type="range" min="0.4" max="1" step="0.05" data-bind="fit.minScale"></label>
+            <label class="field range"><span>Сдвигать в сторону <output data-out="fit.maxShift"></output></span><input type="range" min="0" max="0.25" step="0.01" data-bind="fit.maxShift"></label>
+            <label class="field range"><span>Замечать рисунок <output data-out="fit.sens"></output></span><input type="range" min="1" max="10" step="1" data-bind="fit.sens"></label>
+            <label class="check"><input type="checkbox" id="showMask"> <span>Показать, что программа считает рисунком</span></label>
+          </section>
+
+          <section class="egroup">
+            <h3 class="egroup__title">Проверить на имени</h3>
+            <div class="presets">
+              <button class="chip" data-sample="0">Ева</button>
+              <button class="chip" data-sample="1">Мария</button>
+              <button class="chip" data-sample="2">Александр</button>
+              <button class="chip" data-sample="3">Анастасия и Константин Белоусовы</button>
+            </div>
+            <div class="row">
+              <input class="input" id="sampleName" aria-label="Пробное имя">
+              <div class="seg" role="group" aria-label="Обращение">
+                <button data-sg="m">он</button><button data-sg="f">она</button><button data-sg="pl">пара</button>
+              </div>
+            </div>
+            <p class="status-line" id="tStatus" aria-live="polite"></p>
+          </section>
+        </div>
+      </div>
+      <div class="sheet__foot">
+        <button class="link link--danger" id="tDelete">Удалить шаблон</button>
+        <span class="grow"></span>
+        <button class="btn btn--ghost" id="tReplace">Заменить картинку</button>
+        <button class="btn" id="tSave">Сохранить</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- ===== Fix one invitation ===== -->
+  <dialog class="sheet sheet--fix" id="fix" aria-labelledby="fixTitle">
+    <div class="sheet__inner">
+      <div class="sheet__head">
+        <div>
+          <h2 class="modal__title" id="fixTitle"></h2>
+          <p class="muted sheet__hint" id="fixSub"></p>
+        </div>
+        <button class="x" id="fixClose" aria-label="Закрыть">×</button>
+      </div>
+      <div class="editor">
+        <div class="stage stage--fix"><canvas id="fixCanvas"></canvas></div>
+        <div class="editor__side">
+          <section class="egroup">
+            <label class="field"><span>Текст на этом приглашении</span><input class="input" id="fixText"></label>
+            <p class="help">Например, «Дорогая тётя Галя» вместо «Дорогая Тётя Галя». Остальные приглашения не изменятся.</p>
+          </section>
+          <section class="egroup">
+            <h3 class="egroup__title">Положение</h3>
+            <label class="field range"><span>Размер <output id="fixSizeOut"></output></span><input type="range" id="fixSize" min="40" max="140" step="1"></label>
+            <label class="field range"><span>Влево — вправо</span><input type="range" id="fixX" min="-30" max="30" step="0.2"></label>
+            <label class="field range"><span>Выше — ниже</span><input type="range" id="fixY" min="-15" max="15" step="0.2"></label>
+            <div class="field">
+              <span>Строк</span>
+              <div class="seg" role="group" aria-label="Строк"><button data-lines="1">одна</button><button data-lines="2">две</button></div>
+            </div>
+            <p class="status-line" id="fixStatus" aria-live="polite"></p>
+          </section>
+        </div>
+      </div>
+      <div class="sheet__foot">
+        <button class="btn btn--ghost" id="fixAuto">Вернуть автоподбор</button>
+        <span class="grow"></span>
+        <button class="btn" id="fixDone">Готово</button>
+      </div>
+    </div>
+  </dialog>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+</body>
+</html>
