@@ -10,6 +10,7 @@ export const FONTS = [
   { family: 'Lora', weights: [400, 500, 600, 700] },
   { family: 'Alice', weights: [400] },
   { family: 'Montserrat', weights: [300, 400, 500, 600] },
+  { family: 'Roboto', weights: [300, 400, 500, 700] },
   { family: 'Great Vibes', weights: [400] },
   { family: 'Marck Script', weights: [400] },
   { family: 'Bad Script', weights: [400] },
@@ -23,9 +24,16 @@ const INK_LIMIT = 0.004; // share of "drawn" pixels under the name that still co
 
 // ---------- Images and fonts ----------
 const images = new Map();
+/** Keys are IndexedDB blob ids, or "url:<path>" for pictures that ship with the app. */
 export function getImage(key) {
   if (!images.has(key)) {
-    const p = blobGet(key)
+    const load = key.startsWith('url:')
+      ? fetch(new URL(key.slice(4), document.baseURI)).then((r) => {
+          if (!r.ok) throw new Error('Картинка шаблона не загрузилась');
+          return r.blob();
+        })
+      : blobGet(key);
+    const p = load
       .then((blob) => {
         if (!blob) throw new Error('Картинка шаблона не найдена');
         return createImageBitmap(blob);
@@ -94,7 +102,7 @@ const hex = (r, g, b) => '#' + [r, g, b].map((v) => Math.round(v).toString(16).p
  * name box — flowers, other text, frames. The name is placed where that map is empty.
  */
 export function prepare(t) {
-  const sig = JSON.stringify([t.imageKey, t.box, !!t.erase?.on, t.erase?.color || null, t.fit?.sens ?? 5]);
+  const sig = JSON.stringify([t.imageKey, t.box, !!t.erase?.on, t.erase?.color || null, t.fit?.sens ?? 5, t.layers || null]);
   if (preps.has(sig)) {
     const hit = preps.get(sig);
     preps.delete(sig);
@@ -132,6 +140,9 @@ async function buildPrep(t, sig) {
     bctx.fillRect(box.x, box.y, box.w, box.h);
     bctx.restore();
   }
+  // The template's own text (heading, date, signature) is part of the background,
+  // so the name fitting below treats it like any other drawing to keep clear of.
+  await drawLayers(bctx, t.layers, W, H);
 
   const ms = Math.min(1, 560 / Math.max(W, H));
   const mw = Math.max(1, Math.round(W * ms)), mh = Math.max(1, Math.round(H * ms));
@@ -366,6 +377,64 @@ export async function layoutFor(t, guest, override) {
 }
 
 // ---------- Drawing ----------
+/** One line of text with extra letter spacing, measuring the whole prefix each time so kerning is kept. */
+function drawLine(ctx, text, x, y, sp) {
+  if (!sp) {
+    ctx.fillText(text, x, y);
+    return;
+  }
+  let prefix = '';
+  Array.from(text).forEach((c, i) => {
+    ctx.fillText(c, x + ctx.measureText(prefix).width + i * sp, y);
+    prefix += c;
+  });
+}
+
+const layerCss = (l, px) => `${l.italic ? 'italic ' : ''}${l.weight || 400} ${px.toFixed(2)}px "${l.family}"`;
+
+/**
+ * Static text and shapes of a template. Positions are fractions of the picture;
+ * a text layer's y is the baseline of its first line, x is its left/right/centre edge.
+ */
+export async function drawLayers(ctx, layers, W, H) {
+  if (!layers?.length) return;
+  await Promise.all(
+    layers
+      .filter((l) => l.type === 'text' && l.text)
+      .map((l) => document.fonts.load(layerCss(l, 48), l.text).catch(() => {})),
+  );
+  ctx.save();
+  ctx.textBaseline = 'alphabetic';
+  ctx.textAlign = 'left';
+  for (const l of layers) {
+    ctx.fillStyle = l.color || '#333';
+    if (l.type === 'rect') {
+      ctx.fillRect(l.x * W, l.y * H, l.w * W, l.h * H);
+      continue;
+    }
+    if (l.type !== 'text' || !l.text?.trim()) continue;
+    const lines = (l.upper ? l.text.toLocaleUpperCase() : l.text).split('\n');
+    let px = l.size * W;
+    const widthAt = (s, size) => {
+      ctx.font = layerCss(l, size);
+      return ctx.measureText(s).width + (l.spacing || 0) * size * Math.max(0, Array.from(s).length - 1);
+    };
+    if (l.maxWidth) {
+      const widest = Math.max(...lines.map((s) => widthAt(s, px)));
+      if (widest > l.maxWidth * W) px *= (l.maxWidth * W) / widest;
+    }
+    const lh = (l.lineHeight || 1.25) * px;
+    lines.forEach((line, i) => {
+      const w = widthAt(line, px);
+      let x = l.x * W;
+      if (l.align === 'right') x -= w;
+      else if (l.align === 'center') x -= w / 2;
+      drawLine(ctx, line, x, l.y * H + i * lh, (l.spacing || 0) * px);
+    });
+  }
+  ctx.restore();
+}
+
 export function draw(ctx, t, prep, layout, k = 1, { background } = {}) {
   ctx.save();
   ctx.imageSmoothingQuality = 'high';
@@ -379,20 +448,7 @@ export function draw(ctx, t, prep, layout, k = 1, { background } = {}) {
   ctx.textBaseline = 'alphabetic';
   ctx.textAlign = 'left';
   const sp = (t.font.spacing || 0) * layout.px * k;
-  for (const l of layout.lines) {
-    const x = l.x * k, y = l.baseline * k;
-    if (!sp) {
-      ctx.fillText(l.text, x, y);
-      continue;
-    }
-    // Letter by letter, measuring the whole prefix each time so kerning is kept
-    const chars = Array.from(l.text);
-    let prefix = '';
-    chars.forEach((c, i) => {
-      ctx.fillText(c, x + ctx.measureText(prefix).width + i * sp, y);
-      prefix += c;
-    });
-  }
+  for (const l of layout.lines) drawLine(ctx, l.text, l.x * k, l.baseline * k, sp);
   ctx.restore();
 }
 

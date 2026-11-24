@@ -93,6 +93,13 @@ export function createEditor({ getFonts, addFont, onSave, onDelete }) {
     $$('[data-align]', dlg).forEach((b) => b.classList.toggle('is-on', b.dataset.align === draft.align));
     $$('[data-sg]', dlg).forEach((b) => b.classList.toggle('is-on', b.dataset.sg === sample.gender));
     $('#sampleName').value = sample.name;
+    const texts = (draft.layers || []).map((l, i) => [l, i]).filter(([l]) => l.type === 'text');
+    $('#layersGroup').hidden = !texts.length;
+    $('#layersList').replaceChildren(...texts.map(([l, i]) =>
+      h('label', { class: 'field' },
+        h('span', { text: l.label || 'Текст' }),
+        h('textarea', { class: 'input', rows: Math.max(1, l.text.split('\n').length), 'data-layer': i, value: l.text }),
+      )));
     $('#eraseColor').disabled = !draft.erase.on;
     $('#eraseAuto').hidden = !draft.erase.color;
     updateOutputs();
@@ -107,6 +114,12 @@ export function createEditor({ getFonts, addFont, onSave, onDelete }) {
 
   dlg.addEventListener('input', (e) => {
     const el = e.target;
+    if (el.dataset?.layer != null) {
+      draft.layers[+el.dataset.layer].text = el.value;
+      dirty = true;
+      schedule();
+      return;
+    }
     if (!el.dataset?.bind) return;
     let v = el.type === 'checkbox' ? el.checked : el.type === 'range' || el.dataset.num != null ? +el.value : el.value;
     setPath(draft, el.dataset.bind, v);
@@ -364,6 +377,7 @@ export function createEditor({ getFonts, addFont, onSave, onDelete }) {
     original = t;
     isNew = false;
     draft = structuredClone(t);
+    if (t.sample) sample = { ...t.sample };
     await show();
   }
 

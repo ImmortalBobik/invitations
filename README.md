@@ -16,6 +16,31 @@ Opening `index.html` by double-click does not work, because browsers block ES mo
 
 It is a plain static site, so it can also be hosted anywhere (GitHub Pages, Vercel, Netlify).
 
+## Ready-made templates
+
+Five templates come built in, rebuilt from the couple's invitation design:
+
+| Template | For |
+| --- | --- |
+| Русский · Вы | one guest, formal "Ждем Вас" |
+| Русский · вас | couples and families, "Ждем вас" |
+| Deutsch · Sie | formal German, one guest or a couple |
+| Deutsch · du | informal German, one guest |
+| Deutsch · ihr | informal German, couples and families |
+
+The background (`templates/floral.jpg`) is the original card with all text removed. The text is
+drawn by the app (`js/builtin.js`), so it stays sharp and every line can be changed in the
+template editor under **Текст приглашения**. If one is deleted, **Вернуть готовые шаблоны** in
+the catalogue brings it back.
+
+## Guest list links
+
+A link like `https://…/invitations/#guests=…` carries the whole guest list (names, groups,
+он/она/пара, notes), compressed, in the part after `#`. Browsers never send that part to the
+server, so the list is not stored online, only in the link. Opening the link adds the guests to the
+app in that browser. **Ссылка на список** in the guest panel makes such a link from the current
+list, for example to move to a phone.
+
 ## How it works
 
 1. **Гости → + Добавить**: paste names (one per line), or load the Word list. In a `.docx` file,
@@ -25,7 +50,7 @@ It is a plain static site, so it can also be hosted anywhere (GitHub Pages, Verc
 2. Check **он / она / пара** next to each name. It picks "Дорогой / Дорогая / Дорогие". The app
    guesses it, and one click changes it. Select two guests and press **Объединить в пару** to
    make one invitation for a couple.
-3. **Загрузить шаблон**: upload the invitation picture (PNG/JPG, Canva export).
+3. Use a ready-made template, or **Свой шаблон** to upload another picture (PNG/JPG, Canva export).
    - Drag the dashed **имя** frame to where the name goes.
    - If the picture already has a sample name in it, tick **Закрасить** to paint over it.
    - Set the greeting for him / her / a couple, the font (or upload your own), size, colour
@@ -65,6 +90,7 @@ site data erases everything.
 | `js/editor.js` | Template editor (name frame, fonts, colours, fitting limits) |
 | `js/fixer.js` | "Поправить" dialog for a single invitation |
 | `js/render.js` | Background analysis, name fitting, drawing |
+| `js/builtin.js`, `templates/` | Ready-made templates: text layers and the floral background |
 | `js/guests.js` | List parsing, Word import, он/она/пара guessing |
 | `js/store.js` | IndexedDB storage |
 | `serve.js` | Tiny local static server |

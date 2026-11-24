@@ -3,6 +3,7 @@ import { parseText, importFile, guessGender } from './guests.js';
 import { render, layoutFor, STATUS, registerFont, forgetImage } from './render.js';
 import { createEditor } from './editor.js';
 import { createFixer } from './fixer.js';
+import { BUILTIN, BUILTIN_VERSION } from './builtin.js';
 import { $, $$, h, uid, toast, downloadBlob, safeName, canvasToBlob, loadJSZip, plural } from './dom.js';
 
 const state = { guests: [], groups: [], templates: [], results: [], fonts: [] };
@@ -245,6 +246,7 @@ $('#addGuestsBtn').addEventListener('click', openAdd);
 $('#emptyAddBtn').addEventListener('click', openAdd);
 $('#addClose').addEventListener('click', () => addDlg.close());
 
+/** Adds guests and returns { added, skipped, groups } */
 function addGuests(entries) {
   // Skip people that are already in the same group (e.g. the same file imported twice),
   // but keep two different guests with the same name inside one new list.
@@ -262,13 +264,18 @@ function addGuests(entries) {
       continue;
     }
     if (!state.groups.includes(e.group)) state.groups.push(e.group);
-    state.guests.push({ id: uid(), name: e.name, note: e.note || '', group: e.group, gender: guessGender(e.name) });
+    const known = ['m', 'f', 'pl'].includes(e.gender);
+    state.guests.push({ id: uid(), name: e.name, note: e.note || '', group: e.group, gender: known ? e.gender : guessGender(e.name), genderSet: known || undefined });
     added++;
   }
   save();
   renderGuests();
   renderActionbar();
-  const groups = new Set(entries.map((e) => e.group)).size;
+  return { added, skipped, groups: new Set(entries.map((e) => e.group)).size };
+}
+
+function addAndReport(entries) {
+  const { added, skipped, groups } = addGuests(entries);
   let msg = `Добавлено ${added} ${plural(added, 'имя', 'имени', 'имён')}`;
   if (groups > 1) msg += ` в ${groups} ${plural(groups, 'группу', 'группы', 'групп')}`;
   if (skipped) msg += `, ${skipped} уже были в списке`;
@@ -279,7 +286,55 @@ $('#addConfirm').addEventListener('click', () => {
   const entries = parseText($('#addText').value, $('#addGroup').value.trim() || 'Гости', $('#addStrip').checked);
   if (!entries.length) return toast('Впишите хотя бы одно имя');
   addDlg.close();
-  addGuests(entries);
+  addAndReport(entries);
+});
+
+// ---------- Guest list as a link ----------
+// The whole list travels compressed in the part of the URL after "#", which browsers
+// never send to the server: the list is not stored anywhere online, only in the link.
+const b64url = (bytes) => btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+
+async function encodeList() {
+  const groups = groupOrder().map((name) => ({
+    name,
+    guests: state.guests.filter((g) => g.group === name).map((g) => (g.note ? [g.name, g.gender, g.note] : [g.name, g.gender])),
+  }));
+  const stream = new Blob([JSON.stringify({ v: 1, groups })]).stream().pipeThrough(new CompressionStream('deflate-raw'));
+  return b64url(new Uint8Array(await new Response(stream).arrayBuffer()));
+}
+
+async function decodeList(code) {
+  const bytes = Uint8Array.from(atob(code.replace(/-/g, '+').replace(/_/g, '/')), (c) => c.charCodeAt(0));
+  const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+  const data = JSON.parse(await new Response(stream).text());
+  return data.groups.flatMap((g) => g.guests.map(([name, gender, note]) => ({ name, gender, note: note || '', group: g.name })));
+}
+
+async function importFromLink() {
+  const m = location.hash.match(/^#guests=([A-Za-z0-9_-]+)$/);
+  if (!m) return;
+  history.replaceState(null, '', location.pathname + location.search);
+  try {
+    const { added, skipped } = addGuests(await decodeList(m[1]));
+    if (added) toast(`Список гостей загружен: ${added} ${plural(added, 'имя', 'имени', 'имён')}` + (skipped ? `, ${skipped} уже были` : ''), 5000);
+    else toast('Этот список гостей уже загружен');
+  } catch {
+    toast('Ссылка со списком гостей повреждена — попросите прислать её ещё раз');
+  }
+}
+
+$('#shareListBtn').addEventListener('click', async () => {
+  try {
+    const url = `${location.origin}${location.pathname}#guests=${await encodeList()}`;
+    if (navigator.share && matchMedia('(hover: none)').matches) {
+      await navigator.share({ title: 'Список гостей', url });
+    } else {
+      await navigator.clipboard.writeText(url);
+      toast('Ссылка со списком скопирована. Откройте её на другом устройстве — список появится там.', 6000);
+    }
+  } catch (err) {
+    if (err.name !== 'AbortError') toast('Не получилось: ' + err.message);
+  }
 });
 $('#addFileBtn').addEventListener('click', () => $('#guestFile').click());
 $('#guestFile').addEventListener('change', async (e) => {
@@ -290,7 +345,7 @@ $('#guestFile').addEventListener('change', async (e) => {
     const entries = await importFile(file, $('#addGroup').value.trim() || 'Гости', $('#addStrip').checked);
     if (!entries.length) return toast('В файле не нашлось имён');
     addDlg.close();
-    addGuests(entries);
+    addAndReport(entries);
   } catch (err) {
     toast(err.message);
   }
@@ -303,11 +358,6 @@ const SAMPLE_GUEST = { name: 'Мария', gender: 'f' };
 function renderCatalog() {
   const grid = $('#catalog');
   grid.textContent = '';
-  grid.append(
-    h('button', { class: 'tcard tcard--add', onclick: () => $('#tplFile').click() },
-      h('span', { class: 'tcard__img' }, h('span', { class: 'tcard__plus', text: '+' }), h('span', { text: 'Загрузить шаблон' }), h('small', { text: 'PNG или JPG' })),
-    ),
-  );
   for (const t of state.templates) {
     const img = h('img', { alt: '' });
     const card = h('div', { class: 'tcard' + (ui.template === t.id ? ' is-active' : ''), 'data-id': t.id, role: 'button', tabIndex: 0, 'aria-pressed': ui.template === t.id },
@@ -323,14 +373,29 @@ function renderCatalog() {
     grid.append(card);
     thumbFor(t).then((url) => { if (url) img.src = url; });
   }
+  grid.append(
+    h('button', { class: 'tcard tcard--add', onclick: () => $('#tplFile').click() },
+      h('span', { class: 'tcard__img' }, h('span', { class: 'tcard__plus', text: '+' }), h('span', { text: 'Свой шаблон' }), h('small', { text: 'картинка PNG или JPG' })),
+    ),
+  );
+  const missing = BUILTIN.filter((b) => !tplById(b.id));
+  $('#restoreTpl').hidden = !missing.length;
 }
+
+$('#restoreTpl').addEventListener('click', () => {
+  const missing = BUILTIN.filter((b) => !tplById(b.id));
+  state.templates.push(...structuredClone(missing));
+  save();
+  renderCatalog();
+  toast(`Вернула ${missing.length} ${plural(missing.length, 'готовый шаблон', 'готовых шаблона', 'готовых шаблонов')}`);
+});
 
 async function thumbFor(t) {
   const sig = JSON.stringify(t);
   const hit = tplThumbs.get(t.id);
   if (hit?.sig === sig) return hit.url;
   try {
-    const { canvas } = await render(t, SAMPLE_GUEST, null, 460);
+    const { canvas } = await render(t, t.sample || SAMPLE_GUEST, null, 460);
     const url = URL.createObjectURL(await canvasToBlob(canvas, 'image/jpeg', 0.86));
     if (hit) URL.revokeObjectURL(hit.url);
     tplThumbs.set(t.id, { sig, url });
@@ -650,6 +715,13 @@ async function init() {
   }
   navigator.storage?.persist?.().catch(() => {});
   await Promise.all(state.fonts.map((f) => registerFont(f).catch(() => {})));
+  // Ready-made templates arrive once; if she deletes one later it stays deleted (there's a restore link)
+  if ((state.builtinVersion || 0) < BUILTIN_VERSION) {
+    state.templates.push(...structuredClone(BUILTIN.filter((b) => !tplById(b.id))));
+    state.builtinVersion = BUILTIN_VERSION;
+    save();
+  }
+  await importFromLink();
   state.results = state.results.filter((r) => guestById(r.guestId) && tplById(r.templateId));
   ui.template = tplById(state.lastTemplate) ? state.lastTemplate : state.templates.length === 1 ? state.templates[0].id : null;
   renderGuests();
@@ -660,6 +732,13 @@ async function init() {
 }
 
 init();
+
+// A list link pasted into a tab where the app is already open only changes the "#" part
+window.addEventListener('hashchange', async () => {
+  await importFromLink();
+  renderGuests();
+  renderActionbar();
+});
 
 // Handy in the browser console when something looks off
 window.__invites = { state, ui, forgetImage };

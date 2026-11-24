@@ -198,7 +198,8 @@ select.input { cursor: pointer; }
   max-height: calc(100vh - 84px - 110px);
 }
 .guests__tools { display: grid; gap: 10px; padding: 12px 20px; border-bottom: 1px solid var(--line-soft); }
-.guests__sel { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.guests__sel { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 12px; }
+.guests__share { margin-left: auto; font-size: 13.5px; color: var(--ink-soft); }
 .bulk { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 16px; padding: 8px 10px; background: #f5ede2; }
 .bulk .input--sm { font-size: 13.5px; padding: 4px 8px; }
 .guests__list { flex: 1; min-height: 0; overflow: auto; padding-bottom: 12px; overscroll-behavior: contain; }
